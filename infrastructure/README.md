@@ -13,7 +13,7 @@
 │                                                                 │
 │  Vehicle Simulator              Azure Cloud                     │
 │  ┌──────────────┐              ┌──────────────────────────────┐ │
-│  │ VIN-001      │──MQTT/HTTPS─▶│  IoT Hub (koreacentral)      │ │
+│  │ VIN-001      │──MQTT/HTTPS─▶│  IoT Hub                     │ │
 │  │ VIN-002      │              │  evpulse-iothub              │ │
 │  │ VIN-003      │              └──────────┬───────────────────┘ │
 │  └──────────────┘                         │ Event Stream        │
@@ -23,9 +23,8 @@
 │                              │  evpulse-sa-job              │   │
 │                              │                              │   │
 │                              │  · Moving Average (μ/σ)      │   │
-│                              │  · Z-Score Anomaly Scoring   │   │
-│                              │  · NORMAL / WARNING /        │   │
-│                              │    CRITICAL state evaluation │   │
+│                              │  · Z-Score calculation       │   │
+│                              │  · Raw telemetry routing     │   │
 │                              └──────────┬───────────────────┘   │
 │                                         │ SQL Output            │
 │                                         ▼                       │
@@ -36,6 +35,8 @@
 │                              │  · telemetry (raw data)      │   │
 │                              │  · baseline (μ/σ per VIN)    │   │
 │                              │  · state_log (status history)│   │
+│                              │  · NORMAL/WARNING/CRITICAL   │   │
+│                              │    state transition logic    │   │
 │                              └──────┬───────────┬───────────┘   │
 │                                     │           │               │
 │                          CRITICAL   │           │ Query         │
@@ -51,7 +52,7 @@
 │                             ▼                                   │
 │                    ┌──────────────────┐  ┌──────────────────┐   │
 │                    │  Microsoft Teams │  │  Azure OpenAI    │   │
-│                    │  #ev-pulse-alerts│  │  RAG Chatbot     │   │
+│                    │  #ev-pulse-alerts│  │  Text-to-SQL Bot │   │
 │                    └──────────────────┘  └──────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -59,6 +60,12 @@
   Azure ML Workspace → LightGBM anomaly detection model training & deployment
   NASA Battery Dataset → BSI weight derivation
   BMW i3 Dataset      → Real-vehicle μ/σ parameter extraction
+
+[Production Model]
+  Endpoint   : ev-anomaly-endpoint-6403dedf
+  Deployment : purple2
+  Model      : ev-lgbm-inference-artifact  v8
+  Redeploy   : see infrastructure/ml-deployment-purple2.yml
 ```
 
 ---
@@ -139,10 +146,10 @@ infrastructure/
 
 ## Region Lock Strategy
 
-| Resource | Region | Reason |
-|----------|--------|--------|
-| IoT Hub, Stream Analytics, SQL, Logic Apps | `koreacentral` | Minimize data pipeline latency |
-| Azure OpenAI (`evpulse-azoai`) | `eastus` | gpt-4o-mini unavailable in Korea Central |
+| Resource | Reason |
+|----------|--------|
+| IoT Hub, Stream Analytics, SQL, Logic Apps | Co-located to minimize data pipeline latency |
+| Azure OpenAI (`evpulse-azoai`) | Deployed in a region where gpt-4o-mini is available |
 
 > Regions are **intentionally hard-coded** rather than exposed as parameters.  
 > This design decision eliminates the risk of accidental cross-region deployments that would break the pipeline architecture.
@@ -158,7 +165,7 @@ infrastructure/
 az login
 
 # Create resource group (one-time setup)
-az group create --name evpulse-rg --location koreacentral
+az group create --name evpulse-rg --location <your-region>
 ```
 
 ### 1. Prepare Parameter File
@@ -180,14 +187,18 @@ az deployment group what-if \
 
 ### 3. Deploy
 
+> Use `main.bicep` for iterative development (5 core resources only).  
+> Use `template.bicep` for full environment rebuild (includes ML Workspace, OpenAI, Key Vault).  
+> Run only one of the two commands per deployment — they are not meant to be executed together.
+
 ```bash
-# main.bicep — core 5 pipeline resources
+# Option A — main.bicep: core 5 pipeline resources (IoT Hub, SQL, SA, Storage, Logic Apps)
 az deployment group create \
   --resource-group evpulse-rg \
   --template-file main.bicep \
   --parameters @parameters_local.json
 
-# template.bicep — full snapshot including ML Workspace and OpenAI
+# Option B — template.bicep: full snapshot including ML Workspace, OpenAI, and Key Vault
 az deployment group create \
   --resource-group evpulse-rg \
   --template-file template.bicep \
@@ -257,6 +268,75 @@ Changes applied relative to the raw Azure Portal export:
 
 ---
 
+## Reproduction File Structure
+
+Even after the resource group is deleted, this repository contains everything needed to fully rebuild the environment.
+
+```
+infrastructure/
+├── template.bicep              ← Recreates all Azure resources (ML Workspace, IoT Hub, etc.)
+├── ml-deployment-purple2.yml   ← Recreates the purple2 ML deployment (model version + compute)
+├── parameters.json             ← Parameter template (replace YOUR_* with real values)
+└── README.md                   ← This file — full architecture and redeployment guide
+```
+
+---
+
+## Full Environment Rebuild Order (after resource group deletion)
+
+### Step 1 — Create resource group
+
+```bash
+az group create \
+  --name 4dt_team_1 \
+  --location <your-region>
+```
+
+### Step 2 — Deploy all Azure infrastructure (template.bicep)
+
+```bash
+az deployment group create \
+  --resource-group 4dt_team_1 \
+  --template-file infrastructure/template.bicep \
+  --parameters @infrastructure/parameters.json \
+    tenantId="YOUR_TENANT_ID" \
+    keyVaultObjectId="YOUR_OBJECT_ID" \
+    subscriptionId="YOUR_SUBSCRIPTION_ID" \
+    sqlAdminPassword="YOUR_SQL_PASSWORD"
+```
+
+> IoT Hub, SQL, Stream Analytics, ML Workspace, Function App, Azure Bot, and all other resources are provisioned with this single command.
+
+### Step 3 — Redeploy the production ML model (purple2)
+
+```bash
+# Install the ML extension (first time only)
+az extension add --name ml
+
+# Recreate the purple2 deployment
+az ml online-deployment create \
+  --file infrastructure/ml-deployment-purple2.yml \
+  --workspace-name ev-modeling-ML \
+  --resource-group 4dt_team_1 \
+  --all-traffic
+```
+
+| Item | Value |
+|------|-------|
+| Endpoint | `ev-anomaly-endpoint-6403dedf` |
+| Deployment | `purple2` |
+| Model | `ev-lgbm-inference-artifact:8` |
+| Algorithm | LightGBM (BSI-based anomaly detection) |
+| Instance | `Standard_DS2_v2` × 1 |
+
+> ML Online Deployments are managed outside Bicep because
+> `Microsoft.MachineLearningServices/onlineDeployments` requires the registered model
+> to exist before the deployment resource can be created — a sequencing constraint that
+> cannot be reliably expressed in a single Bicep template. The YAML file captures all
+> settings so the deployment can be reproduced deterministically with one CLI command.
+
+---
+
 ## Deployed Resources (main.bicep)
 
 | Resource | Name Pattern | Role |
@@ -264,6 +344,6 @@ Changes applied relative to the raw Azure Portal export:
 | IoT Hub | `evpulse-iothub-{env}` | Receive vehicle telemetry |
 | SQL Server | `evpulse-sqlserver-{env}` | Store telemetry and status data |
 | SQL Database | `evpulse-db-{env}` | S0 / 10 DTU |
-| Stream Analytics | `evpulse-sa-job-{env}` | Real-time anomaly detection processing |
+| Stream Analytics | `evpulse-sa-job-{env}` | Real-time Z-score calculation and telemetry routing |
 | Storage Account | `evpulsestorage{env}` | Logic Apps runtime storage |
 | Logic Apps | `evpulse-logic-app-{env}` | CRITICAL alert → Teams notification |
