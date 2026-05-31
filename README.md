@@ -7,19 +7,6 @@ Built as a 10-day team MVP. My role: Cloud / DevOps.
 
 ---
 
-## System Overview
-BMW i3 Dataset (70 vehicles, 1.09M rows)
--> Python Simulator (100 vehicles, ~100 msg/s)
--> Azure IoT Hub
--> Stream Analytics  (Z-score calculation · SA JavaScript Functions → Azure ML)
--> Azure ML          (BSI scoring · NORMAL / WARNING / CRITICAL)
--> Azure SQL         (state transition logic)
--> Azure Function    (REST API)
--> HTML Dashboard    (real-time fleet monitoring)
--> Logic Apps        (CRITICAL alert → Slack)
--> Azure OpenAI      (GPT-4o-mini Text-to-SQL chatbot)
----
-
 ## System Architecture
 <img width="1649" height="954" alt="EV-Pulse_final pipeline" src="https://github.com/user-attachments/assets/3f2e50f2-7ee9-438e-b995-915e1c974463" />
 
