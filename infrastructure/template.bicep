@@ -56,6 +56,24 @@ param workspaces_evmodelingml1303723571_name string = 'evmodelingml1303723571'
 param smartdetectoralertrules_failure_anomalies_evmodelingml8998220664_name string = 'failure anomalies - evmodelingml8998220664'
 param actiongroups_application_insights_smart_detection_externalid string = '/subscriptions/${subscriptionId}/resourceGroups/a000-aml-rg/providers/microsoft.insights/actiongroups/application insights smart detection'
 
+@description('Microsoft Teams group ID for Logic App alert notifications — find in Teams channel URL or admin portal')
+param teamsGroupId string = 'YOUR_TEAMS_GROUP_ID'
+
+@description('Microsoft Teams channel ID for Logic App alert notifications — find in Teams channel URL or admin portal')
+param teamsChannelId string = 'YOUR_TEAMS_CHANNEL_ID'
+
+// ── Additional resource parameters (from portal CSV — not in original export) ──
+param storageAccounts_4dtteam19174_name string = '4dtteam19174'
+param storageAccounts_evpulsestoragedev_name string = 'evpulsestoragedev'
+param serverfarms_ASP_4dtteam1_9d0a_name string = 'ASP-4dtteam1-9d0a'
+param sites_evpulse_report_function_name string = 'evpulse-report-function'
+param components_evpulse_report_function_name string = 'evpulse-report-function'
+param smartdetectoralertrules_failure_anomalies_evpulse_report_function_name string = 'Failure Anomalies - evpulse-report-function'
+param managedIdentity_evpulse_azurebot_name string = 'evpulse-azurebot'
+param botServices_evpulse_azurebot_name string = 'evpulse-azurebot'
+param registries_dcb3bab8_name string = 'dcb3bab86b8249768958c307ec831b05'
+param onlineEndpoints_ev_anomaly_6403dedf_name string = 'ev-anomaly-endpoint-6403dedf'
+
 resource accounts_evpulse_azoai_name_resource 'Microsoft.CognitiveServices/accounts@2025-12-01' = {
   name: accounts_evpulse_azoai_name
   // [Region Lock] eastus — gpt-4o-mini is unavailable in Korea Central; pinned to East US.
@@ -384,7 +402,7 @@ resource connections_teams_name_resource 'Microsoft.Web/connections@2016-06-01' 
   location: 'koreacentral'
   kind: 'V1'
   properties: {
-    displayName: '4dt002@dataschool.msai.kr'
+    displayName: 'EV-Pulse Teams Connection'
     statuses: [
       {
         status: 'Connected'
@@ -679,23 +697,8 @@ resource servers_sqlserver_4dt_team1_name_AllowAllWindowsAzureIps 'Microsoft.Sql
   }
 }
 
-resource servers_sqlserver_4dt_team1_name_ClientIp_2026_5_19_13_51_41 'Microsoft.Sql/servers/firewallRules@2025-02-01-preview' = {
-  parent: servers_sqlserver_4dt_team1_name_resource
-  name: 'ClientIp-2026-5-19_13-51-41'
-  properties: {
-    startIpAddress: '175.192.165.144'
-    endIpAddress: '175.192.165.144'
-  }
-}
-
-resource servers_sqlserver_4dt_team1_name_QueryEditorClientIPAddress_1779175496965 'Microsoft.Sql/servers/firewallRules@2025-02-01-preview' = {
-  parent: servers_sqlserver_4dt_team1_name_resource
-  name: 'QueryEditorClientIPAddress_1779175496965'
-  properties: {
-    startIpAddress: '160.238.37.47'
-    endIpAddress: '160.238.37.47'
-  }
-}
+// Personal IP firewall rules removed — add your own IP via Azure Portal if needed:
+// SQL Server → Networking → Add client IP
 
 resource Microsoft_Sql_servers_securityAlertPolicies_servers_sqlserver_4dt_team1_name_Default 'Microsoft.Sql/servers/securityAlertPolicies@2025-02-01-preview' = {
   parent: servers_sqlserver_4dt_team1_name_resource
@@ -1082,8 +1085,8 @@ resource workflows_evpulse_logic_app_name_resource 'Microsoft.Logic/workflows@20
                 method: 'post'
                 body: {
                   recipient: {
-                    groupId: '4b05b947-d2c5-4db4-b131-5015ea93bdf6'
-                    channelId: '19:59ACDDcTXzWcFKU3qlDilCRo_dhdqFbBNjxb4PpmRYw1@thread.tacv2'
+                    groupId: teamsGroupId
+                    channelId: teamsChannelId
                   }
                   messageBody: '<p class="editor-paragraph">Alert detected: [@{triggerBody()?[\'alertStatus\']}]</p><p class="editor-paragraph">ID: @{triggerBody()?[\'alertId\']}</p><p class="editor-paragraph">BSI Value: @{triggerBody()?[\'bsiValue\']}</p><p class="editor-paragraph">Triggered Feature: @{triggerBody()?[\'triggeredFeature\']}</p><p class="editor-paragraph">Detected At: @{formatDateTime(addHours(triggerOutputs()?[\'body/timestamp\'], 9), \'yyyy-MM-dd HH:mm\')}</p>'
                 }
@@ -1494,7 +1497,7 @@ resource sites_ev_pulse_chat_name_resource 'Microsoft.Web/sites@2024-11-01' = {
     clientCertMode: 'Required'
     hostNamesDisabled: false
     ipMode: 'IPv4'
-    customDomainVerificationId: '520102906446FA8AD73B8CFA97C3FF8F5911B86B3D031F586F4B1F9C7A1868D5'
+    // customDomainVerificationId omitted — auto-assigned by Azure on deployment
     containerSize: 1536
     dailyMemoryTimeQuota: 0
     httpsOnly: true
@@ -1526,6 +1529,7 @@ resource workspaces_ev_modeling_ML_name_resource 'Microsoft.MachineLearningServi
     storageAccount: storageAccounts_evmodelingml3270747925_name_resource.id
     keyVault: vaults_evmodelingml9323514119_name_resource.id
     applicationInsights: components_evmodelingml8998220664_name_resource.id
+    containerRegistry: registries_evmodelingml_name_resource.id
     hbiWorkspace: false
     managedNetwork: {
       isolationMode: 'Disabled'
@@ -1539,5 +1543,254 @@ resource workspaces_ev_modeling_ML_name_resource 'Microsoft.MachineLearningServi
     systemDatastoresAuthMode: 'accesskey'
     enableServiceSideCMKEncryption: false
     provisionNetworkNow: false
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Additional resources from portal CSV (not in original export)
+// ════════════════════════════════════════════════════════════════
+
+// ── Container Registry: evmodelingmlcr (linked to ML Workspace) ──
+param registries_evmodelingml_name string = 'evmodelingmlcr'
+
+resource registries_evmodelingml_name_resource 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+  name: registries_evmodelingml_name
+  location: 'koreacentral'
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    adminUserEnabled: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// ── Storage: 4dtteam19174 (evpulse-report-function runtime storage) ──
+resource storageAccounts_4dtteam19174_name_resource 'Microsoft.Storage/storageAccounts@2025-08-01' = {
+  name: storageAccounts_4dtteam19174_name
+  location: 'koreacentral'
+  sku: {
+    name: 'Standard_LRS'
+    tier: 'Standard'
+  }
+  kind: 'StorageV2'
+  properties: {
+    defaultToOAuthAuthentication: false
+    publicNetworkAccess: 'Enabled'
+    allowCrossTenantReplication: false
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: true
+    networkAcls: {
+      bypass: 'AzureServices'
+      virtualNetworkRules: []
+      ipRules: []
+      defaultAction: 'Allow'
+    }
+    supportsHttpsTrafficOnly: true
+    encryption: {
+      services: {
+        file: { keyType: 'Account', enabled: true }
+        blob: { keyType: 'Account', enabled: true }
+      }
+      keySource: 'Microsoft.Storage'
+    }
+    accessTier: 'Hot'
+  }
+}
+
+// ── Storage: evpulsestoragedev (development environment storage) ──
+resource storageAccounts_evpulsestoragedev_name_resource 'Microsoft.Storage/storageAccounts@2025-08-01' = {
+  name: storageAccounts_evpulsestoragedev_name
+  location: 'koreacentral'
+  sku: {
+    name: 'Standard_LRS'
+    tier: 'Standard'
+  }
+  kind: 'StorageV2'
+  properties: {
+    publicNetworkAccess: 'Enabled'
+    allowCrossTenantReplication: false
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: true
+    networkAcls: {
+      bypass: 'AzureServices'
+      virtualNetworkRules: []
+      ipRules: []
+      defaultAction: 'Allow'
+    }
+    supportsHttpsTrafficOnly: true
+    encryption: {
+      services: {
+        file: { keyType: 'Account', enabled: true }
+        blob: { keyType: 'Account', enabled: true }
+      }
+      keySource: 'Microsoft.Storage'
+    }
+    accessTier: 'Hot'
+  }
+}
+
+// ── App Service Plan: ASP-4dtteam1-9d0a (FlexConsumption — for evpulse-report-function) ──
+resource serverfarms_ASP_4dtteam1_9d0a_name_resource 'Microsoft.Web/serverfarms@2024-11-01' = {
+  name: serverfarms_ASP_4dtteam1_9d0a_name
+  location: 'Korea Central'
+  sku: {
+    name: 'FC1'
+    tier: 'FlexConsumption'
+    size: 'FC1'
+    family: 'FC'
+    capacity: 0
+  }
+  kind: 'functionapp'
+  properties: {
+    perSiteScaling: false
+    elasticScaleEnabled: false
+    maximumElasticWorkerCount: 1
+    isSpot: false
+    reserved: true
+    isXenon: false
+    hyperV: false
+    targetWorkerCount: 0
+    targetWorkerSizeId: 0
+    zoneRedundant: false
+    asyncScalingEnabled: false
+  }
+}
+
+// ── Application Insights: evpulse-report-function ──
+resource components_evpulse_report_function_name_resource 'microsoft.insights/components@2020-02-02' = {
+  name: components_evpulse_report_function_name
+  location: 'koreacentral'
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    Flow_Type: 'Redfield'
+    Request_Source: 'IbizaWebAppExtensionCreate'
+    RetentionInDays: 90
+    WorkspaceResourceId: workspaces_evmodelingml1303723571_name_resource.id
+    IngestionMode: 'LogAnalytics'
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
+  }
+}
+
+// ── Function App: evpulse-report-function (report generation function) ──
+resource sites_evpulse_report_function_name_resource 'Microsoft.Web/sites@2024-11-01' = {
+  name: sites_evpulse_report_function_name
+  location: 'Korea Central'
+  kind: 'functionapp,linux'
+  properties: {
+    enabled: true
+    serverFarmId: serverfarms_ASP_4dtteam1_9d0a_name_resource.id
+    reserved: true
+    isXenon: false
+    hyperV: false
+    dnsConfiguration: {}
+    siteConfig: {
+      numberOfWorkers: 1
+      linuxFxVersion: 'Python|3.11'
+      acrUseManagedIdentityCreds: false
+      alwaysOn: false
+      http20Enabled: false
+      functionAppScaleLimit: 200
+      minimumElasticInstanceCount: 0
+    }
+    scmSiteAlsoStopped: false
+    clientAffinityEnabled: false
+    clientCertEnabled: false
+    clientCertMode: 'Required'
+    hostNamesDisabled: false
+    httpsOnly: true
+    redundancyMode: 'None'
+    publicNetworkAccess: 'Enabled'
+    storageAccountRequired: false
+  }
+  dependsOn: [
+    storageAccounts_4dtteam19174_name_resource
+  ]
+}
+
+// ── Smart Detector Alert Rule: Failure Anomalies - evpulse-report-function ──
+// Note: actionGroups omitted — service principal lacks read access to a000-aml-rg action group
+resource smartdetectoralertrules_evpulse_report_function_name_resource 'microsoft.alertsmanagement/smartDetectorAlertRules@2021-04-01' = {
+  name: smartdetectoralertrules_failure_anomalies_evpulse_report_function_name
+  location: 'global'
+  properties: {
+    description: 'Failure Anomalies notifies you of an unusual rise in the rate of failed HTTP requests or dependency calls.'
+    state: 'Enabled'
+    severity: 'Sev3'
+    frequency: 'PT1M'
+    detector: {
+      id: 'FailureAnomaliesDetector'
+    }
+    scope: [
+      components_evpulse_report_function_name_resource.id
+    ]
+    actionGroups: {
+      groupIds: []
+    }
+  }
+}
+
+// ── Managed Identity: evpulse-azurebot (MSI authentication for Bot Service) ──
+resource managedIdentity_evpulse_azurebot_name_resource 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: managedIdentity_evpulse_azurebot_name
+  location: 'koreacentral'
+}
+
+// ── Azure Bot: evpulse-azurebot (Text-to-SQL chatbot)
+// [Region Lock] global — Bot Service is a global service
+// Text-to-SQL flow: natural language query → Azure OpenAI (evpulse-azoai) → SQL generation → 4dt_team1_DB query
+resource botServices_evpulse_azurebot_name_resource 'Microsoft.BotService/botServices@2022-09-15' = {
+  name: botServices_evpulse_azurebot_name
+  location: 'global'
+  sku: {
+    name: 'F0'
+  }
+  kind: 'azurebot'
+  properties: {
+    displayName: botServices_evpulse_azurebot_name
+    iconUrl: 'https://docs.botframework.com/static/devportal/client/images/bot-framework-default.png'
+    msaAppType: 'UserAssignedMSI'
+    msaAppId: managedIdentity_evpulse_azurebot_name_resource.properties.clientId
+    msaAppTenantId: tenantId
+    msaAppMSIResourceId: managedIdentity_evpulse_azurebot_name_resource.id
+    isCmekEnabled: false
+    publicNetworkAccess: 'Enabled'
+    isStreamingSupported: false
+  }
+}
+
+// ── Container Registry: dcb3bab86b8249768958c307ec831b05 (AML secondary registry) ──
+resource registries_dcb3bab8_name_resource 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+  name: registries_dcb3bab8_name
+  location: 'koreacentral'
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    adminUserEnabled: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// ── ML Online Endpoint: ev-anomaly-endpoint-6403dedf (purple2 — final production model) ──
+// Role: Serves the BSI anomaly detection model
+// Note: The purple2 deployment is managed outside Bicep via ml-deployment-purple2.yml
+//       due to ARM API constraints on model URI resolution.
+//       Redeploy with: az ml online-deployment create --file infrastructure/ml-deployment-purple2.yml
+resource onlineEndpoints_ev_anomaly_6403dedf_name_resource 'Microsoft.MachineLearningServices/workspaces/onlineEndpoints@2025-12-01' = {
+  parent: workspaces_ev_modeling_ML_name_resource
+  name: onlineEndpoints_ev_anomaly_6403dedf_name
+  location: 'koreacentral'
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    authMode: 'Key'
+    publicNetworkAccess: 'Enabled'
+    description: 'EV battery anomaly detection model endpoint (purple2 deployment — ev-lgbm-inference-artifact:8)'
   }
 }

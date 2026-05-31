@@ -31,6 +31,9 @@
     },
     "vulnerabilityAssessments_Default_storageContainerPath": {
       "value": "YOUR_STORAGE_CONTAINER_PATH"
+    },
+    "sqlAdminPassword": {
+      "value": "YOUR_SQL_ADMIN_PASSWORD"
     }
   }
 }

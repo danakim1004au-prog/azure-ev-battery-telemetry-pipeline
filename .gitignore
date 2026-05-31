@@ -1,10 +1,41 @@
-cat > .gitignore << 'EOF'
-.DS_Store
+# ── Sensitive parameter files (contain real secrets — never commit) ──
+parameters.local.json
+infrastructure/parameters.local.json
+infrastructure/parameters_local.json
+*.local.json
+
+# ── Environment variables / credentials ───────────────────────────
+.env
+.env.*
+*.env
+
+# Azure credential files
+azure_credentials.json
+azure-credentials.json
+*credentials*.json
+
+# ── Python ────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
-*.local.json
-parameters.local.json
-EOF
+.Python
+
+# ── macOS ─────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Azure / local development ──────────────────────────────────────
+__azurite_db_*.json
+local.settings.json
+.azure/
+
+# ── Data files (large and potentially sensitive) ───────────────────
+*.csv
+*.jsonl
+
+# ── Certificates / keys ────────────────────────────────────────────
+*.pem
+*.key
+*.pfx
+*.p12
